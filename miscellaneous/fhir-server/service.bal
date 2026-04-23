@@ -398,10 +398,10 @@ function init() returns error? {
     log:printInfo("FHIR Server started successfully");
     log:printInfo(string `FHIR Server is listening at http://${displayHost}:${httpPort} (base path /fhir/r4)`);
 
-    runtime:onGracefulStop(function () returns error? {
-        log:printInfo(string `FHIR Server shutting down gracefully.`);
-        return;
-    });
+    runtime:onGracefulStop(function() returns error? {
+                log:printInfo(string `FHIR Server shutting down gracefully.`);
+                return;
+            });
     // Ensure Device/fhir-server exists for AuditEvent logging
     handlers:ReadHandler readHandler = new handlers:ReadHandler();
     json|error deviceResult = readHandler.readResource(jdbcClient, "Device", "fhir-server");
@@ -438,9 +438,9 @@ function init() returns error? {
     }
     // Terminology Service profiles (ValueSet, CodeSystem, ConceptMap) for R4 terminology operations
     readonly & r4:Profile[] terminologyProfiles = [
-        { url: "http://hl7.org/fhir/StructureDefinition/ValueSet", resourceType: "ValueSet", modelType: r4:ValueSet }.cloneReadOnly(),
-        { url: "http://hl7.org/fhir/StructureDefinition/CodeSystem", resourceType: "CodeSystem", modelType: r4:CodeSystem }.cloneReadOnly(),
-        { url: "http://hl7.org/fhir/StructureDefinition/ConceptMap", resourceType: "ConceptMap", modelType: r4:ConceptMap }.cloneReadOnly()
+        {url: "http://hl7.org/fhir/StructureDefinition/ValueSet", resourceType: "ValueSet", modelType: r4:ValueSet}.cloneReadOnly(),
+        {url: "http://hl7.org/fhir/StructureDefinition/CodeSystem", resourceType: "CodeSystem", modelType: r4:CodeSystem}.cloneReadOnly(),
+        {url: "http://hl7.org/fhir/StructureDefinition/ConceptMap", resourceType: "ConceptMap", modelType: r4:ConceptMap}.cloneReadOnly()
     ];
     foreach readonly & r4:Profile p in terminologyProfiles {
         r4:fhirRegistry.addProfileToResourceType(p);
@@ -1367,7 +1367,7 @@ function initiateExportOperation(string resourceType, r4:FHIRContext fhirContext
         }
     }
 
-  // Extract _since parameter (FHIR instant - include resources updated AFTER this time)
+    // Extract _since parameter (FHIR instant - include resources updated AFTER this time)
     string? sinceFilter = ();
     r4:RequestSearchParameter[]? sinceParams = searchParams["_since"];
     if sinceParams is r4:RequestSearchParameter[] && sinceParams.length() > 0 {
@@ -1378,10 +1378,10 @@ function initiateExportOperation(string resourceType, r4:FHIRContext fhirContext
             time:Utc|error parsedTime = time:utcFromString(trimmedSince);
             if parsedTime is error {
                 return r4:createFHIRError(
-                    "Invalid _since parameter format. Expected FHIR instant: YYYY-MM-DDThh:mm:ss.sss+zz:zz or YYYY-MM-DDThh:mm:ssZ",
-                    r4:ERROR,
-                    r4:PROCESSING,
-                    httpStatusCode = http:STATUS_BAD_REQUEST
+                        "Invalid _since parameter format. Expected FHIR instant: YYYY-MM-DDThh:mm:ss.sss+zz:zz or YYYY-MM-DDThh:mm:ssZ",
+                        r4:ERROR,
+                        r4:PROCESSING,
+                        httpStatusCode = http:STATUS_BAD_REQUEST
                 );
             }
             sinceFilter = trimmedSince;
@@ -1565,7 +1565,7 @@ function processExportJob(string jobId, string resourceType, string? patientId =
         } else {
             // Separate files per resource type (default)
             foreach var [resType, resources] in resourcesByType.entries() {
-                
+
                 if resources.length() > 0 {
                     string fileName = resType + ".ndjson";
                     string filePath = jobDir + fileName;
@@ -1932,6 +1932,30 @@ service /fhir/r4/_export on httpListener {
     // Download export file
     resource function get download/[string jobId]/[string fileName]() returns http:Response|r4:FHIRError {
         return downloadExportFile(jobId, fileName);
+    }
+}
+
+// # ViewDefinition/$viewdefinition-run Service (SQL-on-FHIR)
+// Accepts a FHIR Parameters resource with a `viewResource` entry OR a raw
+// ViewDefinition JSON body. Returns tabular rows as a JSON array. PostgreSQL only.
+//
+// [string op] captures the operation segment because '-' is not a valid Ballerina
+// identifier character; the value is validated to "$viewdefinition-run" at runtime.
+service /fhir/r4/ViewDefinition on httpListener {
+
+    isolated resource function post [string op](http:Request req) returns http:Response|r4:OperationOutcome|r4:FHIRError {
+        if op != "$viewdefinition-run" {
+            return r4:createFHIRError(
+                    string `Unknown ViewDefinition operation: ${op}. Use $viewdefinition-run.`,
+                    r4:ERROR, r4:INVALID,
+                    httpStatusCode = http:STATUS_NOT_FOUND);
+        }
+        json|error body = req.getJsonPayload();
+        if body is error {
+            return r4:createFHIRError(string `Invalid JSON body: ${body.message()}`,
+                    r4:ERROR, r4:INVALID, httpStatusCode = http:STATUS_BAD_REQUEST);
+        }
+        return handlers:performViewDefinitionRun(jdbcClient, body);
     }
 }
 
@@ -6914,7 +6938,7 @@ service /fhir/r4/ConceptMap on new fhirr4:Listener(config = r4_api_config:concep
             return toTerminologyOpError(result);
         }
         do {
-	        any parsed = check fhirParser:parse(result).ensureType();
+            any parsed = check fhirParser:parse(result).ensureType();
             anydata|r4:OperationOutcome|r4:FHIRError converted = convertToTypedResource(parsed, Parameters, "Parameters");
             return <Parameters|r4:OperationOutcome|r4:FHIRError>converted;
         } on fail var e {
@@ -7170,7 +7194,7 @@ service /fhir/r4/CodeSystem on new fhirr4:Listener(config = r4_api_config:codesy
         }
         do {
             any parsed = check fhirParser:parse(result).ensureType();
-        anydata|r4:OperationOutcome|r4:FHIRError converted = convertToTypedResource(parsed, Parameters, "Parameters");
+            anydata|r4:OperationOutcome|r4:FHIRError converted = convertToTypedResource(parsed, Parameters, "Parameters");
             return <Parameters|r4:OperationOutcome|r4:FHIRError>converted;
         } on fail var e {
             return toTerminologyParseError(e);

@@ -19,3 +19,15 @@ groupId = "com.h2database"
 artifactId = "postgresql"
 version = "42.7.9"
 groupId = "org.postgresql"
+
+[[dependency]]
+name = "sql_on_fhir_lib"
+org = "mahima_de_silva"
+repository = "local"
+version = "0.1.0"
+
+[[dependency]]
+name = "sof_postgres"
+org = "mahima_de_silva"
+repository = "local"
+version = "0.1.0"

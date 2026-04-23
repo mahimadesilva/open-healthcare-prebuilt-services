@@ -9,6 +9,7 @@ BASE_URL="http://localhost:9090/fhir/r4"
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 SERVER_PID=""
 SERVER_STARTED=false
+RESPONSE_BODY_FILE=$(mktemp)
 
 # Color codes
 GREEN='\033[0;32m'
@@ -37,6 +38,7 @@ EXPORT_COND_ID="test-exp-cond-001"
 
 print_test() {
     TEST_NUM=$((TEST_NUM + 1))
+    > "$RESPONSE_BODY_FILE"
     echo -e "\n${YELLOW}[Test $TEST_NUM]${NC} $1"
 }
 
@@ -48,6 +50,9 @@ print_pass() {
 print_fail() {
     FAILED=$((FAILED + 1))
     echo -e "${RED}✗ FAIL${NC}: $1"
+    if [ -s "$RESPONSE_BODY_FILE" ]; then
+        echo -e "  Response: $(cat "$RESPONSE_BODY_FILE")"
+    fi
 }
 
 # Cleanup function
@@ -59,6 +64,7 @@ cleanup() {
         wait $SERVER_PID 2>/dev/null || true
         echo "Server stopped"
     fi
+    rm -f "$RESPONSE_BODY_FILE" 2>/dev/null || true
 }
 
 # Set trap to cleanup on exit
@@ -91,7 +97,7 @@ start_server() {
 # Returns 0 on success (manifest in /tmp/export_manifest.json), 1 on failure/timeout
 wait_for_export() {
     local status_url="$1"
-    local max_wait=30
+    local max_wait=20000
     for i in $(seq 1 $max_wait); do
         HTTP_CODE=$(curl -s -w "%{http_code}" -o /tmp/export_manifest.json "$status_url")
         if [ "$HTTP_CODE" = "200" ]; then
@@ -209,7 +215,7 @@ fi
 
 # Test 3: Read Patient
 print_test "Read Patient"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/Patient/$PATIENT_ID")
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" "$BASE_URL/Patient/$PATIENT_ID")
 if [ "$HTTP_CODE" = "200" ]; then
     print_pass "Successfully read Patient (HTTP $HTTP_CODE)"
 else
@@ -254,7 +260,7 @@ fi
 
 # Test 5: Update Appointment
 print_test "Update Appointment status"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null -X PUT "$BASE_URL/Appointment/$APPOINTMENT_ID" \
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" -X PUT "$BASE_URL/Appointment/$APPOINTMENT_ID" \
   -H "Content-Type: application/fhir+json" \
   -d "{
     \"resourceType\": \"Appointment\",
@@ -286,7 +292,7 @@ fi
 
 # Test 6: Search by Patient reference
 print_test "Search Appointments by Patient reference"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/Appointment?patient=Patient/$PATIENT_ID")
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" "$BASE_URL/Appointment?patient=Patient/$PATIENT_ID")
 if [ "$HTTP_CODE" = "200" ]; then
     print_pass "Successfully searched by Patient reference (HTTP $HTTP_CODE)"
 else
@@ -295,7 +301,7 @@ fi
 
 # Test 7: Search Patient by name
 print_test "Search Patient by name"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/Patient?name=Doe")
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" "$BASE_URL/Patient?name=Doe")
 if [ "$HTTP_CODE" = "200" ]; then
     print_pass "Successfully searched Patient by name (HTTP $HTTP_CODE)"
 else
@@ -304,7 +310,7 @@ fi
 
 # Test 8: Search Patient by gender
 print_test "Search Patient by gender"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/Patient?gender=female")
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" "$BASE_URL/Patient?gender=female")
 if [ "$HTTP_CODE" = "200" ]; then
     print_pass "Successfully searched Patient by gender (HTTP $HTTP_CODE)"
 else
@@ -313,7 +319,7 @@ fi
 
 # Test 9: Search Patient by birthdate
 print_test "Search Patient by birthdate"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/Patient?birthdate=1990-05-15")
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" "$BASE_URL/Patient?birthdate=1990-05-15")
 if [ "$HTTP_CODE" = "200" ]; then
     print_pass "Successfully searched Patient by birthdate (HTTP $HTTP_CODE)"
 else
@@ -322,7 +328,7 @@ fi
 
 # Test 10: Search with date prefix
 print_test "Search Patient by birthdate with prefix (gt)"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/Patient?birthdate=gt1985-01-01")
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" "$BASE_URL/Patient?birthdate=gt1985-01-01")
 if [ "$HTTP_CODE" = "200" ]; then
     print_pass "Successfully searched with date prefix (HTTP $HTTP_CODE)"
 else
@@ -331,7 +337,7 @@ fi
 
 # Test 11: Create with invalid reference (should fail)
 print_test "Create Appointment with invalid reference (expect failure)"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null -X POST "$BASE_URL/Appointment" \
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" -X POST "$BASE_URL/Appointment" \
   -H "Content-Type: application/fhir+json" \
   -d '{
     "resourceType": "Appointment",
@@ -354,7 +360,7 @@ fi
 
 # Test 12: Get instance history
 print_test "Get Appointment history"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/Appointment/$APPOINTMENT_ID/_history")
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" "$BASE_URL/Appointment/$APPOINTMENT_ID/_history")
 if [ "$HTTP_CODE" = "200" ]; then
     print_pass "Successfully retrieved history (HTTP $HTTP_CODE)"
 else
@@ -363,7 +369,7 @@ fi
 
 # Test 12.5: Get specific version (versionRead)
 print_test "Get Appointment specific version"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/Appointment/$APPOINTMENT_ID/_history/1")
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" "$BASE_URL/Appointment/$APPOINTMENT_ID/_history/1")
 if [ "$HTTP_CODE" = "200" ]; then
     print_pass "Successfully retrieved specific version (HTTP $HTTP_CODE)"
 else
@@ -372,7 +378,7 @@ fi
 
 # Test 12.6: PATCH Appointment
 print_test "PATCH Appointment (partial update)"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null -X PATCH "$BASE_URL/Appointment/$APPOINTMENT_ID" \
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" -X PATCH "$BASE_URL/Appointment/$APPOINTMENT_ID" \
   -H "Content-Type: application/fhir+json" \
   -d '{
     "resourceType": "Appointment",
@@ -414,7 +420,7 @@ fi
 
 # Test 14: Search by _lastUpdated
 print_test "Search by _lastUpdated"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/Appointment?_lastUpdated=gt2024-11-01")
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" "$BASE_URL/Appointment?_lastUpdated=gt2024-11-01")
 if [ "$HTTP_CODE" = "200" ]; then
     print_pass "Successfully searched by _lastUpdated (HTTP $HTTP_CODE)"
 else
@@ -423,7 +429,7 @@ fi
 
 # Test 15: Delete resources
 print_test "Delete Appointment"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null -X DELETE "$BASE_URL/Appointment/$APPOINTMENT_ID")
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" -X DELETE "$BASE_URL/Appointment/$APPOINTMENT_ID")
 if [ "$HTTP_CODE" = "200" ]; then
     print_pass "Successfully deleted Appointment (HTTP $HTTP_CODE)"
 else
@@ -431,7 +437,7 @@ else
 fi
 
 print_test "Delete Patient"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null -X DELETE "$BASE_URL/Patient/$PATIENT_ID")
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" -X DELETE "$BASE_URL/Patient/$PATIENT_ID")
 if [ "$HTTP_CODE" = "200" ]; then
     print_pass "Successfully deleted Patient (HTTP $HTTP_CODE)"
 else
@@ -439,7 +445,7 @@ else
 fi
 
 print_test "Delete Practitioner"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null -X DELETE "$BASE_URL/Practitioner/$PRACTITIONER_ID")
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" -X DELETE "$BASE_URL/Practitioner/$PRACTITIONER_ID")
 if [ "$HTTP_CODE" = "200" ]; then
     print_pass "Successfully deleted Practitioner (HTTP $HTTP_CODE)"
 else
@@ -447,7 +453,7 @@ else
 fi
 
 print_test "Delete Medication"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null -X DELETE "$BASE_URL/Medication/$MEDICATION_ID")
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" -X DELETE "$BASE_URL/Medication/$MEDICATION_ID")
 if [ "$HTTP_CODE" = "200" ]; then
     print_pass "Successfully deleted Medication (HTTP $HTTP_CODE)"
 else
@@ -456,7 +462,7 @@ fi
 
 # Test 16: Verify deletion (Note: Server may use soft delete)
 print_test "Verify resource after deletion"
-VERIFY_DELETE=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/Patient/$PATIENT_ID")
+VERIFY_DELETE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" "$BASE_URL/Patient/$PATIENT_ID")
 if [ "$VERIFY_DELETE" = "404" ] || [ "$VERIFY_DELETE" = "410" ]; then
     print_pass "Deleted resource returns $VERIFY_DELETE (not found)"
 else
@@ -470,7 +476,7 @@ fi
 
 # Test 17: Read non-existent Patient (expect 404)
 print_test "Read non-existent Patient (expect 404)"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/Patient/non-existent-id-999")
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" "$BASE_URL/Patient/non-existent-id-999")
 if [ "$HTTP_CODE" = "404" ]; then
     print_pass "Non-existent Patient correctly returns 404 (HTTP $HTTP_CODE)"
 else
@@ -479,7 +485,7 @@ fi
 
 # Test 18: Read non-existent Practitioner (expect 404)
 print_test "Read non-existent Practitioner (expect 404)"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/Practitioner/non-existent-id-999")
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" "$BASE_URL/Practitioner/non-existent-id-999")
 if [ "$HTTP_CODE" = "404" ]; then
     print_pass "Non-existent Practitioner correctly returns 404 (HTTP $HTTP_CODE)"
 else
@@ -488,7 +494,7 @@ fi
 
 # Test 19: Read non-existent Appointment (expect 404)
 print_test "Read non-existent Appointment (expect 404)"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/Appointment/non-existent-id-999")
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" "$BASE_URL/Appointment/non-existent-id-999")
 if [ "$HTTP_CODE" = "404" ]; then
     print_pass "Non-existent Appointment correctly returns 404 (HTTP $HTTP_CODE)"
 else
@@ -497,7 +503,7 @@ fi
 
 # Test 20: Read non-existent Medication (expect 404)
 print_test "Read non-existent Medication (expect 404)"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/Medication/non-existent-id-999")
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" "$BASE_URL/Medication/non-existent-id-999")
 if [ "$HTTP_CODE" = "404" ]; then
     print_pass "Non-existent Medication correctly returns 404 (HTTP $HTTP_CODE)"
 else
@@ -534,6 +540,8 @@ PRAC2_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/Practitioner" \
   }')
 
 HTTP_CODE=$(echo "$PRAC2_RESPONSE" | tail -n1)
+PRAC2_BODY=$(echo "$PRAC2_RESPONSE" | sed '$d')
+echo "$PRAC2_BODY" > "$RESPONSE_BODY_FILE"
 PRAC2_ID="test-prac-002"
 if [ "$HTTP_CODE" = "201" ]; then
     print_pass "Created Practitioner for testing (HTTP $HTTP_CODE)"
@@ -574,6 +582,8 @@ PAT2_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/Patient" \
   }')
 
 HTTP_CODE=$(echo "$PAT2_RESPONSE" | tail -n1)
+PAT2_BODY=$(echo "$PAT2_RESPONSE" | sed '$d')
+echo "$PAT2_BODY" > "$RESPONSE_BODY_FILE"
 PAT2_ID="test-patient-002"
 if [ "$HTTP_CODE" = "201" ]; then
     print_pass "Created Patient for testing (HTTP $HTTP_CODE)"
@@ -583,7 +593,7 @@ fi
 
 # Test 23: Update Patient (PUT)
 print_test "Update Patient with PUT"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null -X PUT "$BASE_URL/Patient/$PAT2_ID" \
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" -X PUT "$BASE_URL/Patient/$PAT2_ID" \
   -H "Content-Type: application/fhir+json" \
   -d '{
     "resourceType": "Patient",
@@ -609,7 +619,7 @@ fi
 
 # Test 24: PATCH Patient
 print_test "PATCH Patient (partial update)"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null -X PATCH "$BASE_URL/Patient/$PAT2_ID" \
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" -X PATCH "$BASE_URL/Patient/$PAT2_ID" \
   -H "Content-Type: application/fhir+json" \
   -d '{
     "resourceType": "Patient",
@@ -625,7 +635,7 @@ fi
 
 # Test 25: Update Practitioner (PUT)
 print_test "Update Practitioner with PUT"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null -X PUT "$BASE_URL/Practitioner/$PRAC2_ID" \
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" -X PUT "$BASE_URL/Practitioner/$PRAC2_ID" \
   -H "Content-Type: application/fhir+json" \
   -d '{
     "resourceType": "Practitioner",
@@ -651,7 +661,7 @@ fi
 
 # Test 26: PATCH Practitioner
 print_test "PATCH Practitioner (partial update)"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null -X PATCH "$BASE_URL/Practitioner/$PRAC2_ID" \
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" -X PATCH "$BASE_URL/Practitioner/$PRAC2_ID" \
   -H "Content-Type: application/fhir+json" \
   -d '{
     "resourceType": "Practitioner",
@@ -690,6 +700,8 @@ MED2_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/Medication" \
   }')
 
 HTTP_CODE=$(echo "$MED2_RESPONSE" | tail -n1)
+MED2_BODY=$(echo "$MED2_RESPONSE" | sed '$d')
+echo "$MED2_BODY" > "$RESPONSE_BODY_FILE"
 MED2_ID="test-med-002"
 if [ "$HTTP_CODE" = "201" ]; then
     print_pass "Created Medication for testing (HTTP $HTTP_CODE)"
@@ -699,7 +711,7 @@ fi
 
 # Test 28: Update Medication (PUT)
 print_test "Update Medication with PUT"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null -X PUT "$BASE_URL/Medication/$MED2_ID" \
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" -X PUT "$BASE_URL/Medication/$MED2_ID" \
   -H "Content-Type: application/fhir+json" \
   -d '{
     "resourceType": "Medication",
@@ -722,7 +734,7 @@ fi
 
 # Test 29: PATCH Medication
 print_test "PATCH Medication (partial update)"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null -X PATCH "$BASE_URL/Medication/$MED2_ID" \
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" -X PATCH "$BASE_URL/Medication/$MED2_ID" \
   -H "Content-Type: application/fhir+json" \
   -d '{
     "resourceType": "Medication",
@@ -763,6 +775,8 @@ APPT2_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/Appointment" \
   }")
 
 HTTP_CODE=$(echo "$APPT2_RESPONSE" | tail -n1)
+APPT2_BODY=$(echo "$APPT2_RESPONSE" | sed '$d')
+echo "$APPT2_BODY" > "$RESPONSE_BODY_FILE"
 APPT2_ID="test-appt-002"
 if [ "$HTTP_CODE" = "201" ]; then
     print_pass "Created Appointment for history testing (HTTP $HTTP_CODE)"
@@ -772,7 +786,7 @@ fi
 
 # Test 31: Get Patient history
 print_test "Get Patient instance history"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/Patient/$PAT2_ID/_history")
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" "$BASE_URL/Patient/$PAT2_ID/_history")
 if [ "$HTTP_CODE" = "200" ]; then
     print_pass "Successfully retrieved Patient history (HTTP $HTTP_CODE)"
 else
@@ -781,7 +795,7 @@ fi
 
 # Test 32: Get Practitioner history
 print_test "Get Practitioner instance history"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/Practitioner/$PRAC2_ID/_history")
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" "$BASE_URL/Practitioner/$PRAC2_ID/_history")
 if [ "$HTTP_CODE" = "200" ]; then
     print_pass "Successfully retrieved Practitioner history (HTTP $HTTP_CODE)"
 else
@@ -790,7 +804,7 @@ fi
 
 # Test 33: Get Medication history
 print_test "Get Medication instance history"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/Medication/$MED2_ID/_history")
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" "$BASE_URL/Medication/$MED2_ID/_history")
 if [ "$HTTP_CODE" = "200" ]; then
     print_pass "Successfully retrieved Medication history (HTTP $HTTP_CODE)"
 else
@@ -799,7 +813,7 @@ fi
 
 # Test 34: Search Practitioner by name
 print_test "Search Practitioner by name"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/Practitioner?name=Johnson")
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" "$BASE_URL/Practitioner?name=Johnson")
 if [ "$HTTP_CODE" = "200" ]; then
     print_pass "Successfully searched Practitioner by name (HTTP $HTTP_CODE)"
 else
@@ -808,7 +822,7 @@ fi
 
 # Test 35: Search Practitioner by identifier
 print_test "Search Practitioner by identifier"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/Practitioner?identifier=MD-67890")
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" "$BASE_URL/Practitioner?identifier=MD-67890")
 if [ "$HTTP_CODE" = "200" ]; then
     print_pass "Successfully searched Practitioner by identifier (HTTP $HTTP_CODE)"
 else
@@ -817,7 +831,7 @@ fi
 
 # Test 36: Search Patient by identifier
 print_test "Search Patient by identifier"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/Patient?identifier=PT-11111")
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" "$BASE_URL/Patient?identifier=PT-11111")
 if [ "$HTTP_CODE" = "200" ]; then
     print_pass "Successfully searched Patient by identifier (HTTP $HTTP_CODE)"
 else
@@ -826,7 +840,7 @@ fi
 
 # Test 37: Search Medication by status
 print_test "Search Medication by status"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/Medication?status=active")
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" "$BASE_URL/Medication?status=active")
 if [ "$HTTP_CODE" = "200" ]; then
     print_pass "Successfully searched Medication by status (HTTP $HTTP_CODE)"
 else
@@ -835,7 +849,7 @@ fi
 
 # Test 38: Search Appointment by status
 print_test "Search Appointment by status"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/Appointment?status=proposed")
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" "$BASE_URL/Appointment?status=proposed")
 if [ "$HTTP_CODE" = "200" ]; then
     print_pass "Successfully searched Appointment by status (HTTP $HTTP_CODE)"
 else
@@ -844,7 +858,7 @@ fi
 
 # Test 39: Search Appointment by date range
 print_test "Search Appointment by date"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/Appointment?date=ge2025-01-01")
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" "$BASE_URL/Appointment?date=ge2025-01-01")
 if [ "$HTTP_CODE" = "200" ]; then
     print_pass "Successfully searched Appointment by date (HTTP $HTTP_CODE)"
 else
@@ -853,7 +867,7 @@ fi
 
 # Test 40: Get Patient version (versionRead)
 print_test "Get Patient specific version"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/Patient/$PAT2_ID/_history/1")
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" "$BASE_URL/Patient/$PAT2_ID/_history/1")
 if [ "$HTTP_CODE" = "200" ]; then
     print_pass "Successfully retrieved Patient version (HTTP $HTTP_CODE)"
 else
@@ -862,7 +876,7 @@ fi
 
 # Test 41: Get Practitioner version (versionRead)
 print_test "Get Practitioner specific version"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/Practitioner/$PRAC2_ID/_history/1")
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" "$BASE_URL/Practitioner/$PRAC2_ID/_history/1")
 if [ "$HTTP_CODE" = "200" ]; then
     print_pass "Successfully retrieved Practitioner version (HTTP $HTTP_CODE)"
 else
@@ -871,7 +885,7 @@ fi
 
 # Test 42: Get Medication version (versionRead)
 print_test "Get Medication specific version"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/Medication/$MED2_ID/_history/1")
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" "$BASE_URL/Medication/$MED2_ID/_history/1")
 if [ "$HTTP_CODE" = "200" ]; then
     print_pass "Successfully retrieved Medication version (HTTP $HTTP_CODE)"
 else
@@ -880,7 +894,7 @@ fi
 
 # Test 43: Update non-existent Patient (should fail)
 print_test "Update non-existent Patient (expect error)"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null -X PUT "$BASE_URL/Patient/non-existent-999" \
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" -X PUT "$BASE_URL/Patient/non-existent-999" \
   -H "Content-Type: application/fhir+json" \
   -d '{
     "resourceType": "Patient",
@@ -897,7 +911,7 @@ fi
 
 # Test 44: Delete non-existent resource (should fail gracefully)
 print_test "Delete non-existent Appointment (expect error)"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null -X DELETE "$BASE_URL/Appointment/non-existent-999")
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" -X DELETE "$BASE_URL/Appointment/non-existent-999")
 if [ "$HTTP_CODE" = "404" ] || [ "$HTTP_CODE" = "400" ]; then
     print_pass "Delete non-existent Appointment correctly handled (HTTP $HTTP_CODE)"
 else
@@ -916,7 +930,7 @@ fi
 
 # Test 46: Search all Practitioners
 print_test "Search all Practitioners (no filter)"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/Practitioner")
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" "$BASE_URL/Practitioner")
 if [ "$HTTP_CODE" = "200" ]; then
     print_pass "Successfully searched all Practitioners (HTTP $HTTP_CODE)"
 else
@@ -925,7 +939,7 @@ fi
 
 # Test 47: Search all Appointments
 print_test "Search all Appointments (no filter)"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/Appointment")
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" "$BASE_URL/Appointment")
 if [ "$HTTP_CODE" = "200" ]; then
     print_pass "Successfully searched all Appointments (HTTP $HTTP_CODE)"
 else
@@ -934,7 +948,7 @@ fi
 
 # Test 48: Search all Medications
 print_test "Search all Medications (no filter)"
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/Medication")
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" "$BASE_URL/Medication")
 if [ "$HTTP_CODE" = "200" ]; then
     print_pass "Successfully searched all Medications (HTTP $HTTP_CODE)"
 else
@@ -947,8 +961,8 @@ fi
 
 # Test 49: Search Appointments with _include=Appointment:patient
 print_test "Search Appointments with _include=Appointment:patient"
-RESPONSE=$(curl -s "$BASE_URL/Appointment?_include=Appointment:patient")
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/Appointment?_include=Appointment:patient")
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" "$BASE_URL/Appointment?_include=Appointment:patient")
+RESPONSE=$(cat "$RESPONSE_BODY_FILE")
 if [ "$HTTP_CODE" = "200" ]; then
     # Check if response has both Appointment and Patient resources
     APPOINTMENT_COUNT=$(echo "$RESPONSE" | grep -o '"resourceType":"Appointment"' | wc -l)
@@ -966,8 +980,8 @@ fi
 
 # Test 50: Search Appointments with _include=Appointment:actor
 print_test "Search Appointments with _include=Appointment:actor"
-RESPONSE=$(curl -s "$BASE_URL/Appointment?_include=Appointment:actor")
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/Appointment?_include=Appointment:actor")
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" "$BASE_URL/Appointment?_include=Appointment:actor")
+RESPONSE=$(cat "$RESPONSE_BODY_FILE")
 if [ "$HTTP_CODE" = "200" ]; then
     # Check if response has search mode include
     INCLUDE_MODE=$(echo "$RESPONSE" | grep -o '"mode":"include"' | wc -l)
@@ -984,8 +998,8 @@ fi
 
 # Test 51: Search Appointments with wildcard _include=*
 print_test "Search Appointments with wildcard _include=*"
-RESPONSE=$(curl -s "$BASE_URL/Appointment?_include=*")
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/Appointment?_include=*")
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" "$BASE_URL/Appointment?_include=*")
+RESPONSE=$(cat "$RESPONSE_BODY_FILE")
 if [ "$HTTP_CODE" = "200" ]; then
     # Check if response is a valid Bundle
     BUNDLE_TYPE=$(echo "$RESPONSE" | grep -o '"type":"searchset"' | wc -l)
@@ -1002,8 +1016,8 @@ fi
 
 # Test 52: Search with _include and filter parameter
 print_test "Search Appointments by status with _include=Appointment:patient"
-RESPONSE=$(curl -s "$BASE_URL/Appointment?status=booked&_include=Appointment:patient")
-HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/Appointment?status=booked&_include=Appointment:patient")
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$RESPONSE_BODY_FILE" "$BASE_URL/Appointment?status=booked&_include=Appointment:patient")
+RESPONSE=$(cat "$RESPONSE_BODY_FILE")
 if [ "$HTTP_CODE" = "200" ]; then
     # Check if response contains both match and include modes
     MATCH_MODE=$(echo "$RESPONSE" | grep -o '"mode":"match"' | wc -l)
