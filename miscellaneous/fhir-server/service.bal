@@ -446,6 +446,24 @@ function init() returns error? {
         r4:fhirRegistry.addProfileToResourceType(p);
     }
     log:printInfo("Terminology Service profiles Registration Completed");
+
+    readonly & r4:Profile viewDefinitionProfile = {
+        url: r4_api_config:PROFILE_BASE_VIEWDEFINITION,
+        resourceType: "ViewDefinition",
+        modelType: r4_api_config:ViewDefinition
+    }.cloneReadOnly();
+    readonly & r4:IGInfoRecord viewDefinitionIGRecord = {
+        title: "SQL on FHIR ViewDefinition",
+        name: r4:FHIR_BASE_IG,
+        terminology: {codeSystems: [], valueSets: []},
+        profiles: {[r4_api_config:PROFILE_BASE_VIEWDEFINITION]: viewDefinitionProfile},
+        searchParameters: []
+    }.cloneReadOnly();
+    r4:FHIRError? vdRegResult = r4:fhirRegistry.addImplementationGuide(new r4:FHIRImplementationGuide(viewDefinitionIGRecord));
+    if vdRegResult is r4:FHIRError {
+        log:printWarn(string `Failed to register ViewDefinition profile: ${vdRegResult.message()}`);
+    }
+    log:printInfo("ViewDefinition profile Registration Completed");
 }
 
 # initialize source system endpoints here
@@ -1932,30 +1950,6 @@ service /fhir/r4/_export on httpListener {
     // Download export file
     resource function get download/[string jobId]/[string fileName]() returns http:Response|r4:FHIRError {
         return downloadExportFile(jobId, fileName);
-    }
-}
-
-// # ViewDefinition/$viewdefinition-run Service (SQL-on-FHIR)
-// Accepts a FHIR Parameters resource with a `viewResource` entry OR a raw
-// ViewDefinition JSON body. Returns tabular rows as a JSON array. PostgreSQL only.
-//
-// [string op] captures the operation segment because '-' is not a valid Ballerina
-// identifier character; the value is validated to "$viewdefinition-run" at runtime.
-service /fhir/r4/ViewDefinition on httpListener {
-
-    isolated resource function post [string op](http:Request req) returns http:Response|r4:OperationOutcome|r4:FHIRError {
-        if op != "$viewdefinition-run" {
-            return r4:createFHIRError(
-                    string `Unknown ViewDefinition operation: ${op}. Use $viewdefinition-run.`,
-                    r4:ERROR, r4:INVALID,
-                    httpStatusCode = http:STATUS_NOT_FOUND);
-        }
-        json|error body = req.getJsonPayload();
-        if body is error {
-            return r4:createFHIRError(string `Invalid JSON body: ${body.message()}`,
-                    r4:ERROR, r4:INVALID, httpStatusCode = http:STATUS_BAD_REQUEST);
-        }
-        return handlers:performViewDefinitionRun(jdbcClient, body);
     }
 }
 
@@ -11608,4 +11602,81 @@ service /fhir/r4/Location on new fhirr4:Listener(config = r4_api_config:location
     isolated resource function post \$validate(r4:FHIRContext fhirContext, Parameters params) returns r4:OperationOutcome|r4:FHIRError {
         return performValidateOperation("Location", params);
     }
+}
+
+# ViewDefinition API
+service /fhir/r4/ViewDefinition on new fhirr4:Listener(config = r4_api_config:viewdefinitionApiConfig) {
+
+    // Search for resources based on a set of criteria.
+    isolated resource function get .(r4:FHIRContext fhirContext) returns r4:Bundle|r4:OperationOutcome|r4:FHIRError {
+        return performResourceSearch("ViewDefinition", fhirContext);
+    }
+
+    // Read the current state of single resource based on its id.
+    isolated resource function get [string id](r4:FHIRContext fhirContext) returns r4_api_config:ViewDefinition|r4:OperationOutcome|r4:FHIRError {
+        any|r4:OperationOutcome|r4:FHIRError result = performResourceRead("ViewDefinition", id);
+        anydata|r4:OperationOutcome|r4:FHIRError converted = convertToTypedResource(result, r4_api_config:ViewDefinition, "ViewDefinition");
+        return <r4_api_config:ViewDefinition|r4:OperationOutcome|r4:FHIRError>converted;
+    }
+
+    // Read the state of a specific version of a resource based on its id.
+    isolated resource function get [string id]/_history/[string vid](r4:FHIRContext fhirContext) returns r4_api_config:ViewDefinition|r4:OperationOutcome|r4:FHIRError {
+        any|r4:OperationOutcome|r4:FHIRError result = performResourceVersionRead("ViewDefinition", id, vid);
+        anydata|r4:OperationOutcome|r4:FHIRError converted = convertToTypedResource(result, r4_api_config:ViewDefinition, "ViewDefinition");
+        return <r4_api_config:ViewDefinition|r4:OperationOutcome|r4:FHIRError>converted;
+    }
+
+    // Create a new resource.
+    isolated resource function post .(r4:FHIRContext fhirContext, r4_api_config:ViewDefinition viewdefinition) returns r4_api_config:ViewDefinition|r4:OperationOutcome|r4:FHIRError {
+        any|r4:OperationOutcome|r4:FHIRError result = performResourceCreate("ViewDefinition", viewdefinition.toJson());
+        anydata|r4:OperationOutcome|r4:FHIRError converted = convertToTypedResource(result, r4_api_config:ViewDefinition, "ViewDefinition");
+        return <r4_api_config:ViewDefinition|r4:OperationOutcome|r4:FHIRError>converted;
+    }
+
+    // Update the current state of a resource completely.
+    isolated resource function put [string id](r4:FHIRContext fhirContext, r4_api_config:ViewDefinition viewdefinition) returns r4_api_config:ViewDefinition|r4:OperationOutcome|r4:FHIRError {
+        any|r4:OperationOutcome|r4:FHIRError result = performResourceUpdate("ViewDefinition", id, viewdefinition.toJson());
+        anydata|r4:OperationOutcome|r4:FHIRError converted = convertToTypedResource(result, r4_api_config:ViewDefinition, "ViewDefinition");
+        return <r4_api_config:ViewDefinition|r4:OperationOutcome|r4:FHIRError>converted;
+    }
+
+    // Update the current state of a resource partially.
+    isolated resource function patch [string id](r4:FHIRContext fhirContext, json patch) returns r4_api_config:ViewDefinition|r4:OperationOutcome|r4:FHIRError {
+        any|r4:OperationOutcome|r4:FHIRError result = performResourcePatch("ViewDefinition", id, patch);
+        anydata|r4:OperationOutcome|r4:FHIRError converted = convertToTypedResource(result, r4_api_config:ViewDefinition, "ViewDefinition");
+        return <r4_api_config:ViewDefinition|r4:OperationOutcome|r4:FHIRError>converted;
+    }
+
+    // Delete a resource.
+    isolated resource function delete [string id](r4:FHIRContext fhirContext) returns r4:OperationOutcome|r4:FHIRError {
+        return performResourceDelete("ViewDefinition", id);
+    }
+
+    // Retrieve the update history for a particular resource.
+    isolated resource function get [string id]/_history(r4:FHIRContext fhirContext) returns r4:Bundle|r4:OperationOutcome|r4:FHIRError {
+        return performResourceHistory("ViewDefinition", id);
+    }
+
+    // Retrieve the update history for all resources.
+    isolated resource function get _history(r4:FHIRContext fhirContext) returns r4:Bundle|r4:OperationOutcome|r4:FHIRError {
+        return performAllResourceHistory("ViewDefinition");
+    }
+
+    // $viewdefinition-run (SQL-on-FHIR): accepts a FHIR Parameters resource with a
+    // `viewResource` entry OR a raw ViewDefinition JSON body. PostgreSQL only.
+    // [string op] captures the operation because '-' is not a valid Ballerina identifier.
+    // isolated resource function post [string op](http:Request req) returns http:Response|r4:OperationOutcome|r4:FHIRError {
+    //     if op != "$viewdefinition-run" {
+    //         return r4:createFHIRError(
+    //                 string `Unknown ViewDefinition operation: ${op}. Use $viewdefinition-run.`,
+    //                 r4:ERROR, r4:INVALID,
+    //                 httpStatusCode = http:STATUS_NOT_FOUND);
+    //     }
+    //     json|error body = req.getJsonPayload();
+    //     if body is error {
+    //         return r4:createFHIRError(string `Invalid JSON body: ${body.message()}`,
+    //                 r4:ERROR, r4:INVALID, httpStatusCode = http:STATUS_BAD_REQUEST);
+    //     }
+    //     return handlers:performViewDefinitionRun(jdbcClient, body);
+    // }
 }
