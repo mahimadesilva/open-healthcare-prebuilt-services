@@ -11662,21 +11662,8 @@ service /fhir/r4/ViewDefinition on new fhirr4:Listener(config = r4_api_config:vi
         return performAllResourceHistory("ViewDefinition");
     }
 
-    // $viewdefinition-run (SQL-on-FHIR): accepts a FHIR Parameters resource with a
-    // `viewResource` entry OR a raw ViewDefinition JSON body. PostgreSQL only.
-    // [string op] captures the operation because '-' is not a valid Ballerina identifier.
-    // isolated resource function post [string op](http:Request req) returns http:Response|r4:OperationOutcome|r4:FHIRError {
-    //     if op != "$viewdefinition-run" {
-    //         return r4:createFHIRError(
-    //                 string `Unknown ViewDefinition operation: ${op}. Use $viewdefinition-run.`,
-    //                 r4:ERROR, r4:INVALID,
-    //                 httpStatusCode = http:STATUS_NOT_FOUND);
-    //     }
-    //     json|error body = req.getJsonPayload();
-    //     if body is error {
-    //         return r4:createFHIRError(string `Invalid JSON body: ${body.message()}`,
-    //                 r4:ERROR, r4:INVALID, httpStatusCode = http:STATUS_BAD_REQUEST);
-    //     }
-    //     return handlers:performViewDefinitionRun(jdbcClient, body);
-    // }
+    // $run (SQL-on-FHIR): accepts Parameters with viewResource entry. PostgreSQL only.
+    isolated resource function post \$run(r4:FHIRContext fhirContext, Parameters params) returns http:Response|r4:OperationOutcome|r4:FHIRError {
+        return handlers:performViewDefinitionRun(jdbcClient, params);
+    }
 }

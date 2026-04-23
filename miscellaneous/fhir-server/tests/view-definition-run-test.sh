@@ -1,8 +1,7 @@
 #!/bin/bash
-# Tests the ViewDefinition/$viewdefinition-run operation (SQL-on-FHIR).
+# Tests the ViewDefinition/$run operation (SQL-on-FHIR).
 # Covers:
 #   - Parameters-wrapped ViewDefinition
-#   - Raw ViewDefinition body
 #   - _format=csv rejection (400)
 #   - viewReference rejection (400)
 #   - Unknown resource type rejection (400)
@@ -58,12 +57,12 @@ do_req() {
 # ─── setup ──────────────────────────────────────────────────────────────────
 
 echo "======================================================================"
-echo -e "${BOLD}FHIR ViewDefinition/\$viewdefinition-run Tests${NC}"
+echo -e "${BOLD}FHIR ViewDefinition/\$run Tests${NC}"
 echo "======================================================================"
 
 # Probe: is the server on Postgres?
 probe_body='{"resourceType":"Parameters","parameter":[{"name":"viewResource","resource":{"resourceType":"ViewDefinition","resource":"Patient","status":"active","select":[{"column":[{"name":"id","path":"id","type":"id"}]}]}}]}'
-probe=$(do_req POST "$BASE_URL/ViewDefinition/\$viewdefinition-run" \
+probe=$(do_req POST "$BASE_URL/ViewDefinition/\$run" \
   -H "Content-Type: application/fhir+json" \
   -d "$probe_body")
 probe_code="${probe%%|*}"
@@ -107,8 +106,8 @@ if [ "$code" = "201" ]; then pass "Seed Patient B"; else fail "Seed Patient B (H
 
 # ─── 1. Parameters-wrapped ViewDefinition ───────────────────────────────────
 
-print_req "POST" "$BASE_URL/ViewDefinition/\$viewdefinition-run  [Parameters wrapper]"
-result=$(do_req POST "$BASE_URL/ViewDefinition/\$viewdefinition-run" \
+print_req "POST" "$BASE_URL/ViewDefinition/\$run  [Parameters wrapper]"
+result=$(do_req POST "$BASE_URL/ViewDefinition/\$run" \
   -H "Content-Type: application/fhir+json" \
   -d '{
     "resourceType": "Parameters",
@@ -133,32 +132,10 @@ else
     fail "Parameters-wrapped run (HTTP $code)"
 fi
 
-# ─── 2. Raw ViewDefinition body ─────────────────────────────────────────────
+# ─── 2. _format=csv → 400 ───────────────────────────────────────────────────
 
-print_req "POST" "$BASE_URL/ViewDefinition/\$viewdefinition-run  [raw ViewDefinition body]"
-result=$(do_req POST "$BASE_URL/ViewDefinition/\$viewdefinition-run" \
-  -H "Content-Type: application/fhir+json" \
-  -d '{
-    "resourceType": "ViewDefinition",
-    "resource": "Patient",
-    "status": "active",
-    "select": [{ "column": [
-      {"name": "id",     "path": "id",                 "type": "id"},
-      {"name": "family", "path": "name.family.first()", "type": "string"}
-    ]}]
-  }')
-code="${result%%|*}"; body="${result#*|}"
-print_res "$code" "$body"
-if [ "$code" = "200" ] && echo "$body" | grep -q '"Alpha"'; then
-    pass "Raw ViewDefinition body returns data"
-else
-    fail "Raw ViewDefinition body (HTTP $code)"
-fi
-
-# ─── 3. _format=csv → 400 ───────────────────────────────────────────────────
-
-print_req "POST" "$BASE_URL/ViewDefinition/\$viewdefinition-run  [_format=csv expect 400]"
-result=$(do_req POST "$BASE_URL/ViewDefinition/\$viewdefinition-run" \
+print_req "POST" "$BASE_URL/ViewDefinition/\$run  [_format=csv expect 400]"
+result=$(do_req POST "$BASE_URL/ViewDefinition/\$run" \
   -H "Content-Type: application/fhir+json" \
   -d '{
     "resourceType": "Parameters",
@@ -176,10 +153,10 @@ code="${result%%|*}"; body="${result#*|}"
 print_res "$code" "$body"
 if [ "$code" = "400" ]; then pass "_format=csv rejected with 400"; else fail "_format=csv (HTTP $code)"; fi
 
-# ─── 4. viewReference → 400 ─────────────────────────────────────────────────
+# ─── 3. viewReference → 400 ─────────────────────────────────────────────────
 
-print_req "POST" "$BASE_URL/ViewDefinition/\$viewdefinition-run  [viewReference expect 400]"
-result=$(do_req POST "$BASE_URL/ViewDefinition/\$viewdefinition-run" \
+print_req "POST" "$BASE_URL/ViewDefinition/\$run  [viewReference expect 400]"
+result=$(do_req POST "$BASE_URL/ViewDefinition/\$run" \
   -H "Content-Type: application/fhir+json" \
   -d '{
     "resourceType": "Parameters",
@@ -191,16 +168,22 @@ code="${result%%|*}"; body="${result#*|}"
 print_res "$code" "$body"
 if [ "$code" = "400" ]; then pass "viewReference rejected with 400"; else fail "viewReference (HTTP $code)"; fi
 
-# ─── 5. Unknown resource type → 400 ─────────────────────────────────────────
+# ─── 4. Unknown resource type → 400 ─────────────────────────────────────────
 
-print_req "POST" "$BASE_URL/ViewDefinition/\$viewdefinition-run  [resource=NotAType expect 400]"
-result=$(do_req POST "$BASE_URL/ViewDefinition/\$viewdefinition-run" \
+print_req "POST" "$BASE_URL/ViewDefinition/\$run  [resource=not-a-type expect 400]"
+result=$(do_req POST "$BASE_URL/ViewDefinition/\$run" \
   -H "Content-Type: application/fhir+json" \
   -d '{
-    "resourceType": "ViewDefinition",
-    "resource": "not-a-type",
-    "status": "active",
-    "select": [{"column":[{"name":"id","path":"id","type":"id"}]}]
+    "resourceType": "Parameters",
+    "parameter": [{
+      "name": "viewResource",
+      "resource": {
+        "resourceType": "ViewDefinition",
+        "resource": "not-a-type",
+        "status": "active",
+        "select": [{"column":[{"name":"id","path":"id","type":"id"}]}]
+      }
+    }]
   }')
 code="${result%%|*}"; body="${result#*|}"
 print_res "$code" "$body"

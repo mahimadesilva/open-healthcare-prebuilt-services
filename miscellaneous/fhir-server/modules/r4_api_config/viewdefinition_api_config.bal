@@ -30,7 +30,25 @@ public final r4:ResourceAPIConfig viewdefinitionApiConfig = {
     searchParameters: [
     ],
     operations: [
-
+        {
+            name: "run",
+            active: true,
+            parameters: [
+                {name: "viewResource",  active: true},
+                {name: "viewReference", active: true},
+                {name: "resource",      active: true},
+                {name: "_format",       active: true}
+            ],
+            additionalProperties: {
+                "meta": {
+                    "operationLevels": {
+                        "typeLevel": true,
+                        "systemLevel": false,
+                        "instanceLevel": false
+                    }
+                }
+            }
+        }
     ],
     serverConfig: (),
     authzConfig: ()

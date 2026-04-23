@@ -19,25 +19,25 @@ import ballerina_fhir_server.utils;
 import ballerina/http;
 import ballerina/log;
 import ballerinax/health.fhir.r4;
+import ballerinax/health.fhir.r4.international401;
 import ballerinax/java.jdbc;
 
 import mahima_de_silva/sof_postgres;
 
-# Execute the SQL-on-FHIR `ViewDefinition/$viewdefinition-run` operation.
+# Execute the SQL-on-FHIR `ViewDefinition/$run` operation.
 #
-# Accepts either a FHIR `Parameters` resource carrying a `viewResource` entry,
-# or a raw `ViewDefinition` JSON body. Transpiles the ViewDefinition to
-# PostgreSQL via `sof_postgres:generateQuery`, runs it against the shared
-# `jdbc:Client`, and returns the rows as a JSON array.
+# Accepts a FHIR `Parameters` resource carrying a `viewResource` entry.
+# Transpiles the ViewDefinition to PostgreSQL via `sof_postgres:generateQuery`,
+# runs it against the shared `jdbc:Client`, and returns the rows as a JSON array.
 #
 # Only supported against a PostgreSQL backend; H2 returns 501.
 # Only `_format=json` is supported; other formats return 400.
 # `viewReference` is rejected because this server does not store ViewDefinitions.
 #
 # + jdbcClient - Shared JDBC client
-# + body - The parsed JSON request body
+# + params - FHIR Parameters resource containing the viewResource entry
 # + return - Response with JSON rows, or a FHIR error
-public isolated function performViewDefinitionRun(jdbc:Client? jdbcClient, json body)
+public isolated function performViewDefinitionRun(jdbc:Client? jdbcClient, international401:Parameters params)
         returns http:Response|r4:OperationOutcome|r4:FHIRError {
 
     log:printDebug("ViewDefinition/$run - Start Execution");
@@ -53,34 +53,12 @@ public isolated function performViewDefinitionRun(jdbc:Client? jdbcClient, json 
     do {
         jdbc:Client validatedClient = check utils:getValidatedJdbcClient(jdbcClient);
 
-        if body !is map<json> {
-            return r4:createFHIRError(
-                    "Request body must be a JSON object (a FHIR Parameters or ViewDefinition resource)",
-                    r4:ERROR, r4:INVALID,
-                    httpStatusCode = http:STATUS_BAD_REQUEST);
+        ViewRunInputs|r4:FHIRError extracted = extractRunInputsFromParameters(<map<json>>params.toJson());
+        if extracted is r4:FHIRError {
+            return extracted;
         }
-
-        json rtField = body["resourceType"] ?: ();
-        string? resourceType = rtField is string ? rtField : ();
-
-        json? viewJson = ();
-        string? requestedFormat = ();
-
-        if resourceType == "Parameters" {
-            ViewRunInputs|r4:FHIRError extracted = extractRunInputsFromParameters(body);
-            if extracted is r4:FHIRError {
-                return extracted;
-            }
-            viewJson = extracted.viewDef;
-            requestedFormat = extracted.format;
-        } else if resourceType == "ViewDefinition" {
-            viewJson = body;
-        } else {
-            return r4:createFHIRError(
-                    string `Body must be a Parameters or ViewDefinition resource. Got resourceType: ${resourceType ?: "<missing>"}`,
-                    r4:ERROR, r4:INVALID,
-                    httpStatusCode = http:STATUS_BAD_REQUEST);
-        }
+        json? viewJson = extracted.viewDef;
+        string? requestedFormat = extracted.format;
 
         if requestedFormat is string {
             string fmt = requestedFormat.toLowerAscii().trim();
@@ -130,7 +108,7 @@ public isolated function performViewDefinitionRun(jdbc:Client? jdbcClient, json 
                     r4:ERROR, r4:INVALID,
                     httpStatusCode = http:STATUS_BAD_REQUEST);
         }
-        log:printDebug(string `ViewDefinition/$run - SQL: ${sqlQuery}`);
+        log:printDebug(string `ViewDefinition/$viewdefinition-run - SQL: ${sqlQuery}`);
 
         stream<record {}, error?> rowStream = validatedClient->query(new utils:RawSQLQuery(sqlQuery));
         record {}[]|error allRows = from record {} row in rowStream
@@ -153,9 +131,9 @@ public isolated function performViewDefinitionRun(jdbc:Client? jdbcClient, json 
         response.setJsonPayload(rows);
         return response;
     } on fail error e {
-        log:printError(string `ViewDefinition/$run failed: ${e.message()}`);
+        log:printError(string `ViewDefinition/$viewdefinition-run failed: ${e.message()}`);
         return r4:createFHIRError(
-                string `ViewDefinition/$run failed: ${e.message()}`,
+                string `ViewDefinition/$viewdefinition-run failed: ${e.message()}`,
                 r4:ERROR, r4:PROCESSING,
                 httpStatusCode = http:STATUS_INTERNAL_SERVER_ERROR);
     }
