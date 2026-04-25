@@ -59,7 +59,9 @@ public function sampleSqlonFhir() returns error? {
     // CAST(jsonb_extract_path_text(r.resource_json, 'id') AS VARCHAR(64)) AS "id"
     // FROM PatientTable AS r
 
-    json[] results = check sql_on_fhir_lib:evaluate(basicResources, viewJson);
+    sql_on_fhir_lib:ViewDefinition viewDef = check viewJson.cloneWithType(sql_on_fhir_lib:ViewDefinition);
+
+    json[] results = check sql_on_fhir_lib:evaluate(basicResources, viewDef);
     io:println(results);
     //     json[] expected = [
     //     {

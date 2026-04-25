@@ -37,6 +37,8 @@ import ballerinax/health.fhir.r4.parser as fhirParser;
 import ballerinax/health.fhir.r4.validator;
 import ballerinax/java.jdbc;
 
+import mahima_de_silva/sql_on_fhir_lib;
+
 // IPS Configuration Record
 type IpsConfig record {|
     string custodianOrganization;
@@ -448,15 +450,15 @@ function init() returns error? {
     log:printInfo("Terminology Service profiles Registration Completed");
 
     readonly & r4:Profile viewDefinitionProfile = {
-        url: r4_api_config:PROFILE_BASE_VIEWDEFINITION,
+        url: sql_on_fhir_lib:PROFILE_BASE_VIEWDEFINITION,
         resourceType: "ViewDefinition",
-        modelType: r4_api_config:ViewDefinition
+        modelType: sql_on_fhir_lib:ViewDefinition
     }.cloneReadOnly();
     readonly & r4:IGInfoRecord viewDefinitionIGRecord = {
         title: "SQL on FHIR ViewDefinition",
         name: r4:FHIR_BASE_IG,
         terminology: {codeSystems: [], valueSets: []},
-        profiles: {[r4_api_config:PROFILE_BASE_VIEWDEFINITION]: viewDefinitionProfile},
+        profiles: {[sql_on_fhir_lib:PROFILE_BASE_VIEWDEFINITION]: viewDefinitionProfile},
         searchParameters: []
     }.cloneReadOnly();
     r4:FHIRError? vdRegResult = r4:fhirRegistry.addImplementationGuide(new r4:FHIRImplementationGuide(viewDefinitionIGRecord));
@@ -11613,38 +11615,38 @@ service /fhir/r4/ViewDefinition on new fhirr4:Listener(config = r4_api_config:vi
     }
 
     // Read the current state of single resource based on its id.
-    isolated resource function get [string id](r4:FHIRContext fhirContext) returns r4_api_config:ViewDefinition|r4:OperationOutcome|r4:FHIRError {
+    isolated resource function get [string id](r4:FHIRContext fhirContext) returns sql_on_fhir_lib:ViewDefinition|r4:OperationOutcome|r4:FHIRError {
         any|r4:OperationOutcome|r4:FHIRError result = performResourceRead("ViewDefinition", id);
-        anydata|r4:OperationOutcome|r4:FHIRError converted = convertToTypedResource(result, r4_api_config:ViewDefinition, "ViewDefinition");
-        return <r4_api_config:ViewDefinition|r4:OperationOutcome|r4:FHIRError>converted;
+        anydata|r4:OperationOutcome|r4:FHIRError converted = convertToTypedResource(result, sql_on_fhir_lib:ViewDefinition, "ViewDefinition");
+        return <sql_on_fhir_lib:ViewDefinition|r4:OperationOutcome|r4:FHIRError>converted;
     }
 
     // Read the state of a specific version of a resource based on its id.
-    isolated resource function get [string id]/_history/[string vid](r4:FHIRContext fhirContext) returns r4_api_config:ViewDefinition|r4:OperationOutcome|r4:FHIRError {
+    isolated resource function get [string id]/_history/[string vid](r4:FHIRContext fhirContext) returns sql_on_fhir_lib:ViewDefinition|r4:OperationOutcome|r4:FHIRError {
         any|r4:OperationOutcome|r4:FHIRError result = performResourceVersionRead("ViewDefinition", id, vid);
-        anydata|r4:OperationOutcome|r4:FHIRError converted = convertToTypedResource(result, r4_api_config:ViewDefinition, "ViewDefinition");
-        return <r4_api_config:ViewDefinition|r4:OperationOutcome|r4:FHIRError>converted;
+        anydata|r4:OperationOutcome|r4:FHIRError converted = convertToTypedResource(result, sql_on_fhir_lib:ViewDefinition, "ViewDefinition");
+        return <sql_on_fhir_lib:ViewDefinition|r4:OperationOutcome|r4:FHIRError>converted;
     }
 
     // Create a new resource.
-    isolated resource function post .(r4:FHIRContext fhirContext, r4_api_config:ViewDefinition viewdefinition) returns r4_api_config:ViewDefinition|r4:OperationOutcome|r4:FHIRError {
+    isolated resource function post .(r4:FHIRContext fhirContext, sql_on_fhir_lib:ViewDefinition viewdefinition) returns sql_on_fhir_lib:ViewDefinition|r4:OperationOutcome|r4:FHIRError {
         any|r4:OperationOutcome|r4:FHIRError result = performResourceCreate("ViewDefinition", viewdefinition.toJson());
-        anydata|r4:OperationOutcome|r4:FHIRError converted = convertToTypedResource(result, r4_api_config:ViewDefinition, "ViewDefinition");
-        return <r4_api_config:ViewDefinition|r4:OperationOutcome|r4:FHIRError>converted;
+        anydata|r4:OperationOutcome|r4:FHIRError converted = convertToTypedResource(result, sql_on_fhir_lib:ViewDefinition, "ViewDefinition");
+        return <sql_on_fhir_lib:ViewDefinition|r4:OperationOutcome|r4:FHIRError>converted;
     }
 
     // Update the current state of a resource completely.
-    isolated resource function put [string id](r4:FHIRContext fhirContext, r4_api_config:ViewDefinition viewdefinition) returns r4_api_config:ViewDefinition|r4:OperationOutcome|r4:FHIRError {
+    isolated resource function put [string id](r4:FHIRContext fhirContext, sql_on_fhir_lib:ViewDefinition viewdefinition) returns sql_on_fhir_lib:ViewDefinition|r4:OperationOutcome|r4:FHIRError {
         any|r4:OperationOutcome|r4:FHIRError result = performResourceUpdate("ViewDefinition", id, viewdefinition.toJson());
-        anydata|r4:OperationOutcome|r4:FHIRError converted = convertToTypedResource(result, r4_api_config:ViewDefinition, "ViewDefinition");
-        return <r4_api_config:ViewDefinition|r4:OperationOutcome|r4:FHIRError>converted;
+        anydata|r4:OperationOutcome|r4:FHIRError converted = convertToTypedResource(result, sql_on_fhir_lib:ViewDefinition, "ViewDefinition");
+        return <sql_on_fhir_lib:ViewDefinition|r4:OperationOutcome|r4:FHIRError>converted;
     }
 
     // Update the current state of a resource partially.
-    isolated resource function patch [string id](r4:FHIRContext fhirContext, json patch) returns r4_api_config:ViewDefinition|r4:OperationOutcome|r4:FHIRError {
+    isolated resource function patch [string id](r4:FHIRContext fhirContext, json patch) returns sql_on_fhir_lib:ViewDefinition|r4:OperationOutcome|r4:FHIRError {
         any|r4:OperationOutcome|r4:FHIRError result = performResourcePatch("ViewDefinition", id, patch);
-        anydata|r4:OperationOutcome|r4:FHIRError converted = convertToTypedResource(result, r4_api_config:ViewDefinition, "ViewDefinition");
-        return <r4_api_config:ViewDefinition|r4:OperationOutcome|r4:FHIRError>converted;
+        anydata|r4:OperationOutcome|r4:FHIRError converted = convertToTypedResource(result, sql_on_fhir_lib:ViewDefinition, "ViewDefinition");
+        return <sql_on_fhir_lib:ViewDefinition|r4:OperationOutcome|r4:FHIRError>converted;
     }
 
     // Delete a resource.

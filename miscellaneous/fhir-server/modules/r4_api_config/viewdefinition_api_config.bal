@@ -21,12 +21,14 @@
 
 import ballerinax/health.fhir.r4;
 
+import mahima_de_silva/sql_on_fhir_lib;
+
 public final r4:ResourceAPIConfig viewdefinitionApiConfig = {
     resourceType: "ViewDefinition",
     profiles: [
             "https://sql-on-fhir.org/ig/StructureDefinition/ViewDefinition"
     ],
-    defaultProfile: PROFILE_BASE_VIEWDEFINITION,
+    defaultProfile: sql_on_fhir_lib:PROFILE_BASE_VIEWDEFINITION,
     searchParameters: [
     ],
     operations: [
@@ -34,10 +36,10 @@ public final r4:ResourceAPIConfig viewdefinitionApiConfig = {
             name: "run",
             active: true,
             parameters: [
-                {name: "viewResource",  active: true},
+                {name: "viewResource", active: true},
                 {name: "viewReference", active: true},
-                {name: "resource",      active: true},
-                {name: "_format",       active: true}
+                {name: "resource", active: true},
+                {name: "_format", active: true}
             ],
             additionalProperties: {
                 "meta": {

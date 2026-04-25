@@ -37,9 +37,6 @@ version = "1.7.0"
 dependencies = [
 	{org = "ballerina", name = "jballerina.java"}
 ]
-modules = [
-	{org = "ballerina", packageName = "constraint", moduleName = "constraint"}
-]
 
 [[package]]
 org = "ballerina"
@@ -393,7 +390,6 @@ org = "ballerinax"
 name = "ballerina_fhir_server"
 version = "1.0.0"
 dependencies = [
-	{org = "ballerina", name = "constraint"},
 	{org = "ballerina", name = "file"},
 	{org = "ballerina", name = "http"},
 	{org = "ballerina", name = "io"},
@@ -610,7 +606,9 @@ org = "mahima_de_silva"
 name = "sql_on_fhir_lib"
 version = "0.1.0"
 dependencies = [
+	{org = "ballerina", name = "constraint"},
 	{org = "ballerina", name = "io"},
+	{org = "ballerinax", name = "health.fhir.r4"},
 	{org = "ballerinax", name = "health.fhir.r4utils.fhirpath"}
 ]
 modules = [

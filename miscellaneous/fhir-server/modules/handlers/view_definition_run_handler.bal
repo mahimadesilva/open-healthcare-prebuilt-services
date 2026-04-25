@@ -130,7 +130,14 @@ public isolated function performViewDefinitionRun(jdbc:Client? jdbcClient, inter
 
         if extracted.resources.length() > 0 {
             // In-memory evaluation path — works with any dbType
-            json[]|error evalResult = sql_on_fhir_lib:evaluate(extracted.resources, viewJson);
+            sql_on_fhir_lib:ViewDefinition|error viewDef = viewJson.cloneWithType(sql_on_fhir_lib:ViewDefinition);
+            if viewDef is error {
+                return r4:createFHIRError(
+                        string `Invalid ViewDefinition structure: ${viewDef.message()}`,
+                        r4:ERROR, r4:INVALID,
+                        httpStatusCode = http:STATUS_BAD_REQUEST);
+            }
+            json[]|error evalResult = sql_on_fhir_lib:evaluate(extracted.resources, viewDef);
             if evalResult is error {
                 return r4:createFHIRError(
                         string `Failed to evaluate ViewDefinition: ${evalResult.message()}`,
