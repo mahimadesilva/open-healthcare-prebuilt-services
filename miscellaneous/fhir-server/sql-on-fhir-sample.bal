@@ -1,7 +1,8 @@
 import ballerina/io;
 
-import mahima_de_silva/sof_postgres;
 import mahima_de_silva/sql_on_fhir_lib;
+import mahima_de_silva/sql_on_fhir_lib.in_memory_runner as sof_im_runner;
+import mahima_de_silva/sql_on_fhir_lib.pg_db_runner as sof_pg_runner;
 
 public function sampleSqlonFhir() returns error? {
     // check processPatients();
@@ -48,12 +49,12 @@ public function sampleSqlonFhir() returns error? {
         ]
     };
 
-    sof_postgres:TranspilerContext ctx = {
+    sof_pg_runner:TranspilerContext ctx = {
         resourceColumn: "resource_json",
         tableName: "PatientTable",
         filterByResourceType: false
     };
-    string viewSql = check sof_postgres:generateQuery(viewJson, ctx);
+    string viewSql = check sof_pg_runner:generateQuery(viewJson, ctx);
     io:println(viewSql);
     // SELECT
     // CAST(jsonb_extract_path_text(r.resource_json, 'id') AS VARCHAR(64)) AS "id"
@@ -61,7 +62,7 @@ public function sampleSqlonFhir() returns error? {
 
     sql_on_fhir_lib:ViewDefinition viewDef = check viewJson.cloneWithType(sql_on_fhir_lib:ViewDefinition);
 
-    json[] results = check sql_on_fhir_lib:evaluate(basicResources, viewDef);
+    json[] results = check sof_im_runner:evaluate(basicResources, viewDef);
     io:println(results);
     //     json[] expected = [
     //     {

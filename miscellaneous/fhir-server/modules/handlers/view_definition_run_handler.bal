@@ -22,8 +22,9 @@ import ballerinax/health.fhir.r4;
 import ballerinax/health.fhir.r4.international401;
 import ballerinax/java.jdbc;
 
-import mahima_de_silva/sof_postgres;
 import mahima_de_silva/sql_on_fhir_lib;
+import mahima_de_silva/sql_on_fhir_lib.in_memory_runner as sof_im_runner;
+import mahima_de_silva/sql_on_fhir_lib.pg_db_runner as sof_pg_runner;
 
 # Execute the SQL-on-FHIR `ViewDefinition/$run` operation.
 #
@@ -137,7 +138,7 @@ public isolated function performViewDefinitionRun(jdbc:Client? jdbcClient, inter
                         r4:ERROR, r4:INVALID,
                         httpStatusCode = http:STATUS_BAD_REQUEST);
             }
-            json[]|error evalResult = sql_on_fhir_lib:evaluate(extracted.resources, viewDef);
+            json[]|error evalResult = sof_im_runner:evaluate(extracted.resources, viewDef);
             if evalResult is error {
                 return r4:createFHIRError(
                         string `Failed to evaluate ViewDefinition: ${evalResult.message()}`,
@@ -158,13 +159,13 @@ public isolated function performViewDefinitionRun(jdbc:Client? jdbcClient, inter
             jdbc:Client validatedClient = check utils:getValidatedJdbcClient(jdbcClient);
 
             // Pre-quote identifiers to match the PascalCase table/column names created by the schema.
-            sof_postgres:TranspilerContext ctx = {
+            sof_pg_runner:TranspilerContext ctx = {
                 resourceColumn: "\"RESOURCE_JSON\"",
                 tableName: string `"${viewResourceType}Table"`,
                 filterByResourceType: false
             };
 
-            string|error sqlQuery = sof_postgres:generateQuery(viewJson, ctx);
+            string|error sqlQuery = sof_pg_runner:generateQuery(viewJson, ctx);
             if sqlQuery is error {
                 return r4:createFHIRError(
                         string `Failed to transpile ViewDefinition to SQL: ${sqlQuery.message()}`,
@@ -203,9 +204,9 @@ public isolated function performViewDefinitionRun(jdbc:Client? jdbcClient, inter
 }
 
 type ViewRunInputs record {|
-    json?   viewDef;
+    json? viewDef;
     string? viewRef;
-    json[]  resources;
+    json[] resources;
     string? format;
 |};
 

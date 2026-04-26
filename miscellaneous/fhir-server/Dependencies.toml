@@ -408,7 +408,6 @@ dependencies = [
 	{org = "ballerinax", name = "health.fhir.r4utils.fhirpath"},
 	{org = "ballerinax", name = "health.fhirr4"},
 	{org = "ballerinax", name = "java.jdbc"},
-	{org = "mahima_de_silva", name = "sof_postgres"},
 	{org = "mahima_de_silva", name = "sql_on_fhir_lib"}
 ]
 modules = [
@@ -592,17 +591,6 @@ modules = [
 
 [[package]]
 org = "mahima_de_silva"
-name = "sof_postgres"
-version = "0.1.0"
-dependencies = [
-	{org = "ballerina", name = "io"}
-]
-modules = [
-	{org = "mahima_de_silva", packageName = "sof_postgres", moduleName = "sof_postgres"}
-]
-
-[[package]]
-org = "mahima_de_silva"
 name = "sql_on_fhir_lib"
 version = "0.1.0"
 dependencies = [
@@ -612,6 +600,8 @@ dependencies = [
 	{org = "ballerinax", name = "health.fhir.r4utils.fhirpath"}
 ]
 modules = [
-	{org = "mahima_de_silva", packageName = "sql_on_fhir_lib", moduleName = "sql_on_fhir_lib"}
+	{org = "mahima_de_silva", packageName = "sql_on_fhir_lib", moduleName = "sql_on_fhir_lib"},
+	{org = "mahima_de_silva", packageName = "sql_on_fhir_lib", moduleName = "sql_on_fhir_lib.in_memory_runner"},
+	{org = "mahima_de_silva", packageName = "sql_on_fhir_lib", moduleName = "sql_on_fhir_lib.pg_db_runner"}
 ]
 
